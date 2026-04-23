@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAP MM/SD AI Copilot</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">◈</span>
+        <span class="logo-text">SAP <strong>MM/SD</strong> Copilot</span>
+      </div>
+      <div class="header-status" id="header-status">
+        <span class="dot dot--ok"></span> <span id="connector-label">mock</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ── LEFT: Context Input ───────────────────────────────────────── -->
+    <aside class="panel panel--left">
+      <h2 class="panel-title">SAP Context</h2>
+
+      <div class="form-group">
+        <label>Transaction (TCode)</label>
+        <div class="input-row">
+          <input id="tcode" type="text" placeholder="MIRO" value="MIRO" />
+          <select id="module">
+            <option value="MM">MM</option>
+            <option value="SD">SD</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Document Number</label>
+        <input id="document_id" type="text" placeholder="51000321" value="51000321" />
+      </div>
+
+      <div class="form-group">
+        <label>Status</label>
+        <select id="status">
+          <option value="BLOCKED">BLOCKED</option>
+          <option value="OPEN">OPEN</option>
+          <option value="PARKED">PARKED</option>
+          <option value="ERROR">ERROR</option>
+          <option value="PENDING">PENDING</option>
+          <option value="POSTED">POSTED</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Company Code</label>
+        <input id="company_code" type="text" placeholder="1000" value="1000" />
+      </div>
+
+      <div class="form-group">
+        <label>Plant / Sales Org</label>
+        <input id="plant" type="text" placeholder="1000" value="1000" />
+      </div>
+
+      <button class="btn btn--primary" id="analyze-btn" onclick="runAnalysis()">
+        ▶ Analyze
+      </button>
+
+      <!-- Quick scenarios -->
+      <div class="scenarios">
+        <p class="scenarios-label">Quick Scenarios</p>
+        <button class="scenario-btn" onclick="loadScenario('mm-grir')">MM: GR/IR Mismatch</button>
+        <button class="scenario-btn" onclick="loadScenario('mm-missing-gr')">MM: Missing GR</button>
+        <button class="scenario-btn" onclick="loadScenario('sd-credit')">SD: Credit Block</button>
+        <button class="scenario-btn" onclick="loadScenario('sd-pricing')">SD: Pricing Error</button>
+      </div>
+    </aside>
+
+    <!-- ── CENTER: Analysis Results ──────────────────────────────────── -->
+    <section class="panel panel--center">
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Analyzing SAP context…</p>
+      </div>
+
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">◈</div>
+        <p>Enter SAP context and click <strong>Analyze</strong> to start.</p>
+      </div>
+
+      <!-- Diagnosis Card -->
+      <div id="diagnosis-card" class="card hidden">
+        <div class="card-header">
+          <span class="card-icon">⚑</span>
+          <h3>Diagnosis</h3>
+          <span id="diagnosis-source" class="badge badge--source"></span>
+        </div>
+        <div class="card-body">
+          <div class="issue-row">
+            <span id="issue-type" class="issue-badge"></span>
+            <span id="severity-badge" class="severity-badge"></span>
+          </div>
+          <p id="root-cause" class="root-cause"></p>
+          <div id="evidence-list" class="evidence-list"></div>
+        </div>
+        <div class="confidence-row">
+          <span class="confidence-label">Confidence</span>
+          <div class="confidence-bar">
+            <div id="confidence-fill" class="confidence-fill"></div>
+          </div>
+          <span id="confidence-pct" class="confidence-pct"></span>
+        </div>
+      </div>
+
+      <!-- Recommended Actions -->
+      <div id="actions-section" class="hidden">
+        <h3 class="section-title">Recommended Actions</h3>
+        <div id="actions-list"></div>
+      </div>
+    </section>
+
+    <!-- ── RIGHT: Simulation & Approval ─────────────────────────────── -->
+    <aside class="panel panel--right">
+      <h2 class="panel-title">Impact & Approval</h2>
+
+      <div id="sim-placeholder" class="placeholder-text">
+        Select an action to simulate its impact.
+      </div>
+
+      <!-- Simulation Card -->
+      <div id="simulation-card" class="card hidden">
+        <div class="card-header">
+          <span class="card-icon">⚡</span>
+          <h3>Simulation</h3>
+          <span id="sim-action-label" class="badge"></span>
+        </div>
+        <div class="card-body">
+          <div class="sim-grid">
+            <div class="sim-stat">
+              <div class="sim-val" id="sim-docs">–</div>
+              <div class="sim-key">Documents</div>
+            </div>
+            <div class="sim-stat">
+              <div class="sim-val" id="sim-financial">–</div>
+              <div class="sim-key">Financial</div>
+            </div>
+            <div class="sim-stat">
+              <div class="sim-val" id="sim-risk-val">–</div>
+              <div class="sim-key">Risk Score</div>
+            </div>
+            <div class="sim-stat">
+              <div class="sim-val" id="sim-reversible">–</div>
+              <div class="sim-key">Reversible</div>
+            </div>
+          </div>
+          <div id="sim-warnings" class="warnings-list"></div>
+          <div id="sim-blockers" class="blockers-list"></div>
+        </div>
+      </div>
+
+      <!-- Approval Controls -->
+      <div id="approval-section" class="card hidden">
+        <div class="card-header">
+          <span class="card-icon">✓</span>
+          <h3>Approval</h3>
+          <span id="approval-status-badge" class="badge"></span>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>Your Name</label>
+            <input id="approver-name" type="text" placeholder="controller_01" />
+          </div>
+          <div class="approval-btns">
+            <button class="btn btn--approve" onclick="submitApproval()">
+              Submit for Approval
+            </button>
+          </div>
+          <div id="approve-reject-section" class="hidden">
+            <button class="btn btn--approve" onclick="approveRequest()">✓ Approve</button>
+            <button class="btn btn--reject" onclick="rejectRequest()">✗ Reject</button>
+          </div>
+          <div id="approval-result" class="approval-result hidden"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    SAP MM/SD AI Copilot v1.0.0 &nbsp;·&nbsp; Powered by Claude &nbsp;·&nbsp;
+    <a href="/api/docs" target="_blank">API Docs</a>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
