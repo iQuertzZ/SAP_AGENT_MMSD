@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -48,5 +49,5 @@ class HealthResponse(BaseModel):
     connector: str = "mock"
     execution_enabled: bool = False
     circuit_breaker: str | None = None
-    sap_metrics: dict | None = None
-    cache: dict | None = None
+    sap_metrics: dict[str, Any] | None = None
+    cache: dict[str, Any] | None = None
