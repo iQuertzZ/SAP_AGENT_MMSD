@@ -5,7 +5,7 @@ ARG VERSION="1.0.0"
 
 # ── Stage 1: builder ──────────────────────────────────────────────────────────
 # python:3.11-slim (not alpine) — asyncpg requires gcc at build time
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir gunicorn>=21.0
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ARG BUILD_DATE="unknown"
 ARG GIT_SHA="unknown"
