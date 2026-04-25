@@ -74,7 +74,7 @@ jobs:
     env:
       DATABASE_URL: ""
       TEST_DATABASE_URL: postgresql+asyncpg://sap_user:sap_pass@localhost:5432/sap_copilot_test
-      ANTHROPIC_API_KEY: "sk-ant-test-fake-key-not-real"
+      ANTHROPIC_API_KEY: ""
       SAP_CONNECTOR: mock
       SECRET_KEY: "ci-test-secret-key-minimum-32-characters-long"
       APP_ENV: development
