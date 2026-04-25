@@ -13,8 +13,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import all ORM models so autogenerate can detect them
+import backend.app.db.models  # noqa: E402, F401
 from backend.app.db.base import Base  # noqa: E402
-import backend.app.db.models  # noqa: E402, F401  (registers models onto Base)
 
 target_metadata = Base.metadata
 
