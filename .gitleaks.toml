@@ -1,0 +1,28 @@
+# Gitleaks configuration — suppress false positives from test fixtures
+
+title = "SAP MM/SD AI Copilot — Gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+description = "Detected a Generic API Key"
+
+[allowlist]
+description = "Test and example values that are intentionally fake"
+regexes = [
+  # Test API keys used in CI and test fixtures
+  "sk-ant-test-fake-key-not-real",
+  # Example values in .env.example
+  "sk-ant-\\.\\.\\.",
+  # CI test secret
+  "ci-test-secret-key",
+  # Dev default secret key in config.py
+  "dev-secret-change-in-production",
+]
+paths = [
+  ".env.example",
+  "backend/tests/",
+  ".github/workflows/",
+]

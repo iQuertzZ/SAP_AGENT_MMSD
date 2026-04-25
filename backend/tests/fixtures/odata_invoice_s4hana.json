@@ -1,0 +1,23 @@
+{
+  "d": {
+    "SupplierInvoice": "5100032100",
+    "FiscalYear": "2024",
+    "Supplier": "1000234",
+    "DocumentAmount": "12345.67",
+    "DocumentCurrency": "EUR",
+    "PaymentBlockingReason": "",
+    "SupplierInvoiceStatus": "O",
+    "PurchaseOrder": "4500012345",
+    "to_SupplierInvoiceItemGLAcct": {
+      "results": [
+        {
+          "SupplierInvoiceItem": "1",
+          "DocumentItemAmount": "12345.67",
+          "DocumentCurrency": "EUR",
+          "GLAccount": "160000",
+          "CostCenter": "C100"
+        }
+      ]
+    }
+  }
+}

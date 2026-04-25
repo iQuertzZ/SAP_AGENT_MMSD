@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "MIRO/001",
+    "message": {
+      "lang": "fr",
+      "value": "Le blocage de paiement ne peut pas être levé — approbation requise"
+    }
+  }
+}

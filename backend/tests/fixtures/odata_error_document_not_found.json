@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "CX_SY_REF_IS_INITIAL",
+    "message": {
+      "lang": "fr",
+      "value": "Document 9999999999 introuvable"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "d": {
+    "results": [
+      {
+        "DocumentNumber": "5100032100",
+        "FiscalYear": "2024",
+        "LifNr": "1000234",
+        "DmbtrSum": "12345.67",
+        "Waers": "EUR",
+        "PaymentBlockingReason": "",
+        "EBELN": "4500012345",
+        "to_DocumentItem": {
+          "results": [
+            {
+              "Buzei": "001",
+              "Wrbtr": "12345.67",
+              "Waers": "EUR",
+              "Hkont": "160000",
+              "Kostl": "C100"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

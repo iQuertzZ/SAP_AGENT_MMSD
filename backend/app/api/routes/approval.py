@@ -14,18 +14,21 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from backend.app.api.deps import (
     get_action_planner,
-    get_approval_service,
+    get_approval_facade,
     get_context_service,
     get_diagnostic_service,
     get_simulator,
+    require_role,
 )
 from backend.app.core.exceptions import ApprovalNotFoundError, ApprovalStateError
 from backend.app.models.approval import ApprovalRequest
+from backend.app.models.auth import SAPRole
 from backend.app.models.context import SAPContext
+from backend.app.schemas.auth import CurrentUser
 from backend.app.schemas.requests import AnalyzeRequest, ApproveRequest, RejectRequest
 from backend.app.schemas.responses import ApprovalListResponse, ApprovalResponse
 from backend.app.services.action_planner import ActionPlanner
-from backend.app.services.approval_service import ApprovalService
+from backend.app.services.approval_facade import ApprovalFacade
 from backend.app.services.context_service import ContextService
 from backend.app.services.diagnostic_service import DiagnosticService
 from backend.app.services.impact_simulator import ImpactSimulator
@@ -40,7 +43,10 @@ async def submit_approval(
     diag_svc: DiagnosticService = Depends(get_diagnostic_service),
     planner: ActionPlanner = Depends(get_action_planner),
     simulator: ImpactSimulator = Depends(get_simulator),
-    approval_svc: ApprovalService = Depends(get_approval_service),
+    facade: ApprovalFacade = Depends(get_approval_facade),
+    current_user: CurrentUser = Depends(
+        require_role(SAPRole.CONSULTANT, SAPRole.MANAGER, SAPRole.ADMIN)
+    ),
 ) -> ApprovalRequest:
     context = SAPContext(**body.model_dump())
     context = await ctx_svc.enrich(context)
@@ -56,25 +62,29 @@ async def submit_approval(
     primary = actions[0]
     simulation = simulator.simulate(context, diagnosis, primary)
 
+    # Use body.user if provided, else fall back to current_user email
+    requested_by = body.user or current_user.email
     request = ApprovalRequest(
         request_id=str(uuid.uuid4()),
         context=context,
         diagnosis=diagnosis,
         recommended_action=primary,
         simulation=simulation,
-        requested_by=body.user,
+        requested_by=requested_by,
     )
-    return approval_svc.submit(request)
+    return await facade.submit(request)
 
 
 @router.post("/approval/{request_id}/approve", response_model=ApprovalResponse)
-def approve(
+async def approve(
     request_id: str,
     body: ApproveRequest,
-    svc: ApprovalService = Depends(get_approval_service),
+    facade: ApprovalFacade = Depends(get_approval_facade),
+    _: CurrentUser = Depends(require_role(SAPRole.MANAGER, SAPRole.ADMIN)),
 ) -> ApprovalResponse:
     try:
-        req = svc.approve(request_id, body.approver, body.comment)
+        # body.approver is the SAP user ID recorded in the document
+        req = await facade.approve(request_id, body.approver, body.comment)
         return ApprovalResponse(
             request_id=req.request_id,
             status=req.status,
@@ -87,13 +97,14 @@ def approve(
 
 
 @router.post("/approval/{request_id}/reject", response_model=ApprovalResponse)
-def reject(
+async def reject(
     request_id: str,
     body: RejectRequest,
-    svc: ApprovalService = Depends(get_approval_service),
+    facade: ApprovalFacade = Depends(get_approval_facade),
+    _: CurrentUser = Depends(require_role(SAPRole.MANAGER, SAPRole.ADMIN)),
 ) -> ApprovalResponse:
     try:
-        req = svc.reject(request_id, body.approver, body.reason)
+        req = await facade.reject(request_id, body.approver, body.reason)
         return ApprovalResponse(
             request_id=req.request_id,
             status=req.status,
@@ -106,20 +117,38 @@ def reject(
 
 
 @router.get("/approval/{request_id}", response_model=ApprovalRequest)
-def get_approval(
+async def get_approval(
     request_id: str,
-    svc: ApprovalService = Depends(get_approval_service),
+    facade: ApprovalFacade = Depends(get_approval_facade),
+    current_user: CurrentUser = Depends(
+        require_role(SAPRole.CONSULTANT, SAPRole.MANAGER, SAPRole.ADMIN)
+    ),
 ) -> ApprovalRequest:
     try:
-        return svc.get(request_id)
+        req = await facade.get(request_id)
+        # CONSULTANT sees only their own submissions
+        if (
+            current_user.role == SAPRole.CONSULTANT
+            and req.requested_by != current_user.email
+        ):
+            raise HTTPException(status_code=404, detail="Approval request not found")
+        return req
     except ApprovalNotFoundError as exc:
         raise HTTPException(status_code=404, detail=exc.message)
 
 
 @router.get("/approval/", response_model=ApprovalListResponse)
-def list_approvals(
+async def list_approvals(
     pending_only: bool = False,
-    svc: ApprovalService = Depends(get_approval_service),
+    facade: ApprovalFacade = Depends(get_approval_facade),
+    current_user: CurrentUser = Depends(
+        require_role(SAPRole.CONSULTANT, SAPRole.MANAGER, SAPRole.ADMIN)
+    ),
 ) -> ApprovalListResponse:
-    items = svc.list_pending() if pending_only else svc.list_all()
+    items = await facade.list_pending() if pending_only else await facade.list_all()
+
+    # CONSULTANT sees only their own submissions
+    if current_user.role == SAPRole.CONSULTANT:
+        items = [i for i in items if i.requested_by == current_user.email]
+
     return ApprovalListResponse(total=len(items), items=items)

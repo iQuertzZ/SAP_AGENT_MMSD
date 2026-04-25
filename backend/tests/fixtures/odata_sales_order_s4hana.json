@@ -1,0 +1,22 @@
+{
+  "d": {
+    "SalesOrder": "0000012345",
+    "SoldToParty": "CUST-001",
+    "OverallSDProcessStatus": "A",
+    "SalesOrganization": "1000",
+    "TransactionCurrency": "EUR",
+    "TotalNetAmount": "8750.00",
+    "CreationDate": "/Date(1704067200000)/",
+    "to_Item": {
+      "results": [
+        {
+          "SalesOrderItem": "000010",
+          "Material": "FG-001",
+          "RequestedQuantity": "5.000",
+          "RequestedQuantityUnit": "EA",
+          "NetAmount": "8750.00"
+        }
+      ]
+    }
+  }
+}

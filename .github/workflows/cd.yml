@@ -1,0 +1,95 @@
+name: CD — Manual Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+      image_tag:
+        description: "Docker image tag to deploy (e.g. latest, sha-abc1234)"
+        required: false
+        default: latest
+      run_migrations:
+        description: "Run Alembic migrations after deploy"
+        required: false
+        type: boolean
+        default: true
+
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+
+  # ── Staging deploy ────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: >
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging') ||
+      (github.event_name == 'release')
+    environment: staging
+
+    steps:
+      - name: Resolve image tag
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to staging via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.STAGING_PATH }}
+            IMAGE_TAG=${{ steps.resolve.outputs.tag }}
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull
+            docker compose up -d --no-build
+            if [ "${{ github.event.inputs.run_migrations }}" = "true" ] || [ "${{ github.event_name }}" = "release" ]; then
+              docker compose exec -T backend alembic upgrade head
+            fi
+            curl -f http://localhost:8000/api/v1/health || exit 1
+            echo "Staging deployment successful (tag: $IMAGE_TAG)"
+
+  # ── Production deploy ─────────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    environment: production
+
+    steps:
+      - name: Deploy to production via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+            IMAGE_TAG=${{ github.event.inputs.image_tag }}
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+            if [ "${{ github.event.inputs.run_migrations }}" = "true" ]; then
+              docker compose exec -T backend alembic upgrade head
+            fi
+            docker system prune -f
+            curl -f http://localhost:8000/api/v1/health || exit 1
+            echo "Production deployment successful (tag: $IMAGE_TAG)"

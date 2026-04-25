@@ -19,8 +19,11 @@ from backend.app.api.deps import (
     get_action_planner,
     get_context_service,
     get_diagnostic_service,
+    require_role,
 )
+from backend.app.models.auth import SAPRole
 from backend.app.models.context import SAPContext
+from backend.app.schemas.auth import CurrentUser
 from backend.app.schemas.requests import AnalyzeRequest
 from backend.app.schemas.responses import AnalysisResponse
 from backend.app.services.action_planner import ActionPlanner
@@ -36,6 +39,9 @@ async def analyze(
     ctx_svc: ContextService = Depends(get_context_service),
     diag_svc: DiagnosticService = Depends(get_diagnostic_service),
     planner: ActionPlanner = Depends(get_action_planner),
+    current_user: CurrentUser = Depends(
+        require_role(SAPRole.CONSULTANT, SAPRole.MANAGER, SAPRole.ADMIN, SAPRole.SERVICE)
+    ),
 ) -> AnalysisResponse:
     t0 = time.monotonic()
 

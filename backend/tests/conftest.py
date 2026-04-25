@@ -1,5 +1,14 @@
-"""Shared pytest fixtures."""
+"""Shared pytest fixtures.
+
+Auth override strategy
+----------------------
+All existing tests use the ``client`` fixture, which automatically overrides
+``get_current_user`` to return a fake ADMIN user — no token required.
+New auth-specific tests that need real authentication use ``auth_client``.
+"""
 from __future__ import annotations
+
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,14 +16,53 @@ from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.models.action import RecommendedAction, RiskLevel
 from backend.app.models.approval import ApprovalRequest, ApprovalStatus
+from backend.app.models.auth import SAPRole
 from backend.app.models.context import DocumentStatus, SAPContext, SAPModule
 from backend.app.models.diagnosis import DiagnosisResult, IssueSeverity, IssueType
 from backend.app.models.simulation import FinancialImpact, SimulationResult, WorkflowImpact
+from backend.app.schemas.auth import CurrentUser
+
+# ── Fake users ────────────────────────────────────────────────────────────────
+
+_FAKE_ADMIN = CurrentUser(
+    user_id="test-admin-id",
+    email="admin@test.local",
+    role=SAPRole.ADMIN,
+    is_active=True,
+)
 
 
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
+# ── Auth override fixture ─────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def override_auth() -> Iterator[None]:
+    """Override JWT auth — injects a fake ADMIN for all tests using ``client``."""
+    from backend.app.api.deps import get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: _FAKE_ADMIN
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+# ── Client fixtures ───────────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def client(override_auth: None) -> Iterator[TestClient]:
+    """TestClient with JWT auth bypassed (ADMIN role). Used by all existing tests."""
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture()
+def auth_client() -> Iterator[TestClient]:
+    """TestClient with REAL JWT auth — used by auth-specific tests."""
+    with TestClient(app) as c:
+        yield c
+
+
+# ── SAP context fixtures ──────────────────────────────────────────────────────
 
 
 @pytest.fixture

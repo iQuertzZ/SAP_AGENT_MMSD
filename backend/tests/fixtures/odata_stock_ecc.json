@@ -1,0 +1,11 @@
+{
+  "d": {
+    "Material": "MAT-001",
+    "Plant": "1000",
+    "StorageLocation": "0001",
+    "MatlWrhsStkQtyInMatBaseUnit": "150.000",
+    "MaterialBaseUnit": "EA",
+    "BlockedStockQty": "5.000",
+    "QualityInspectionStockQty": "10.000"
+  }
+}

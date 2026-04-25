@@ -1,0 +1,97 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 2 * * 1"  # every Monday at 02:00 UTC
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+
+  # ── Dependency vulnerability scan ─────────────────────────────────────────────
+  dependency-scan:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Python dependency audit
+        run: pip-audit -r requirements.txt --desc on
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend dependency audit
+        working-directory: frontend
+        run: npm audit --audit-level=critical
+
+  # ── Docker image vulnerability scan ───────────────────────────────────────────
+  docker-scan:
+    name: Docker Image Scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: sap-copilot-backend:scan
+          cache-from: type=gha
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: sap-copilot-backend:scan
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  # ── Secret scanning ───────────────────────────────────────────────────────────
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml

@@ -8,8 +8,11 @@ from backend.app.api.deps import (
     get_context_service,
     get_diagnostic_service,
     get_simulator,
+    require_role,
 )
+from backend.app.models.auth import SAPRole
 from backend.app.models.context import SAPContext
+from backend.app.schemas.auth import CurrentUser
 from backend.app.schemas.requests import SimulateRequest
 from backend.app.schemas.responses import SimulationResponse
 from backend.app.services.action_planner import ActionPlanner
@@ -27,6 +30,9 @@ async def simulate(
     diag_svc: DiagnosticService = Depends(get_diagnostic_service),
     planner: ActionPlanner = Depends(get_action_planner),
     simulator: ImpactSimulator = Depends(get_simulator),
+    current_user: CurrentUser = Depends(
+        require_role(SAPRole.CONSULTANT, SAPRole.MANAGER, SAPRole.ADMIN, SAPRole.SERVICE)
+    ),
 ) -> SimulationResponse:
     context = SAPContext(
         tcode=body.tcode,

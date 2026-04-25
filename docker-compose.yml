@@ -1,0 +1,88 @@
+---
+# SAP MM/SD AI Copilot — development stack
+# Usage:
+#   docker compose up -d          → start all services
+#   docker compose down           → stop all services
+#   docker compose logs -f backend → stream backend logs
+
+networks:
+  sap_copilot_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: sap_copilot_db
+    networks:
+      - sap_copilot_net
+    environment:
+      POSTGRES_DB: sap_copilot
+      POSTGRES_USER: sap_user
+      POSTGRES_PASSWORD: sap_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # ports:
+    #   - "5432:5432"   # uncomment to expose DB to host (conflicts if local PG runs)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sap_user -d sap_copilot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Backend (FastAPI) ───────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sap_copilot_backend
+    networks:
+      - sap_copilot_net
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sap_user:sap_pass@db:5432/sap_copilot
+      SAP_CONNECTOR: mock
+      APP_ENV: development
+      LOG_LEVEL: INFO
+      SECRET_KEY: dev-secret-key-change-in-production-min-32-chars!!
+      FIRST_ADMIN_EMAIL: admin@sap-copilot.local
+      FIRST_ADMIN_PASSWORD: changeme
+      EXECUTION_ENABLED: "false"
+    # env_file: .env          # uncomment to load a local .env override
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app/backend  # hot-reload: changes reflected immediately
+    command:
+      - sh
+      - -c
+      - "alembic upgrade head && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    restart: unless-stopped
+
+  # ── Frontend (React + Vite → nginx) ────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: sap_copilot_frontend
+    networks:
+      - sap_copilot_net
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

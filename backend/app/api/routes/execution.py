@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from backend.app.api.deps import get_approval_service, get_execution_service
+from backend.app.api.deps import get_approval_facade, get_execution_service, require_role
 from backend.app.core.exceptions import (
     ApprovalNotFoundError,
     ApprovalStateError,
@@ -11,8 +11,10 @@ from backend.app.core.exceptions import (
     ExecutionError,
 )
 from backend.app.models.approval import ApprovalRequest
+from backend.app.models.auth import SAPRole
+from backend.app.schemas.auth import CurrentUser
 from backend.app.schemas.requests import ExecuteRequest
-from backend.app.services.approval_service import ApprovalService
+from backend.app.services.approval_facade import ApprovalFacade
 from backend.app.services.execution_service import ExecutionService
 
 router = APIRouter()
@@ -21,13 +23,14 @@ router = APIRouter()
 @router.post("/execute", response_model=ApprovalRequest)
 async def execute(
     body: ExecuteRequest,
-    approval_svc: ApprovalService = Depends(get_approval_service),
+    facade: ApprovalFacade = Depends(get_approval_facade),
     exec_svc: ExecutionService = Depends(get_execution_service),
+    _: CurrentUser = Depends(require_role(SAPRole.ADMIN)),
 ) -> ApprovalRequest:
     try:
-        req = approval_svc.get(body.request_id)
+        req = await facade.get(body.request_id)
         result = await exec_svc.execute(req, executor=body.executor)
-        return approval_svc.mark_executed(body.request_id, result)
+        return await facade.mark_executed(body.request_id, result)
     except ApprovalNotFoundError as exc:
         raise HTTPException(status_code=404, detail=exc.message)
     except ApprovalStateError as exc:
@@ -39,7 +42,8 @@ async def execute(
 
 
 @router.get("/execute/audit")
-def get_audit_log(
+async def get_audit_log(
     exec_svc: ExecutionService = Depends(get_execution_service),
+    _: CurrentUser = Depends(require_role(SAPRole.MANAGER, SAPRole.ADMIN)),
 ) -> list[dict]:
     return exec_svc.get_audit_log()

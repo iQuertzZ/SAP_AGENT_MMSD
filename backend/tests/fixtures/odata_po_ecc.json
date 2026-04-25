@@ -1,0 +1,24 @@
+{
+  "d": {
+    "PurchaseOrder": "4500012345",
+    "Vendor": "1000234",
+    "PurchaseOrderStatus": "OPEN",
+    "CompanyCode": "1000",
+    "Plant": "1000",
+    "DocumentCurrency": "EUR",
+    "NetPriceAmount": "5000.00",
+    "CreationDate": "/Date(1704067200000)/",
+    "to_PurchaseOrderItem": {
+      "results": [
+        {
+          "PurchaseOrderItem": "00010",
+          "Material": "MAT-001",
+          "OrderQuantity": "10.000",
+          "PurchaseOrderQuantityUnit": "EA",
+          "NetPriceAmount": "500.00",
+          "ScheduleLineDeliveryDate": "/Date(1706745600000)/"
+        }
+      ]
+    }
+  }
+}

@@ -43,6 +43,10 @@ class ApprovalListResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     version: str = "1.0.0"
+    git_sha: str = "unknown"
     ai_enabled: bool = False
     connector: str = "mock"
     execution_enabled: bool = False
+    circuit_breaker: str | None = None
+    sap_metrics: dict | None = None
+    cache: dict | None = None
